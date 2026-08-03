@@ -1,0 +1,39 @@
+%% SoundMatch RAG: system architecture and data flow
+%% Matches the implementation in src/ (parse -> retrieve -> generate -> verify)
+flowchart TD
+    U["User free-text query<br/>e.g. 'chill lofi to study to, not sleepy'"] --> P
+
+    subgraph PARSE["1. Parse  (src/parse.py)"]
+        P["LLM parses query"] --> PG{"Valid JSON?<br/>genre in vocab?<br/>numbers in 0-1?"}
+        PG -- "no" --> KF["Keyword fallback parser"]
+        PG -- "yes" --> PROF["UserProfile"]
+        KF --> PROF
+    end
+
+    subgraph RETRIEVE["2. Retrieve  (src/recommender.py)"]
+        PROF --> SCORE["score_song over full catalog<br/>weighted closeness rule"]
+        CSV[("data/songs.csv<br/>19-song catalog")] --> SCORE
+        SCORE --> TOPK["Top-5 candidate songs<br/>deterministic ranking"]
+    end
+
+    subgraph GENERATE["3. Generate  (src/generate.py)"]
+        TOPK --> GEN["LLM writes recommendation<br/>given ONLY the 5 candidates"]
+    end
+
+    subgraph VERIFY["4. Verify guardrail  (src/generate.py)"]
+        GEN --> VG{"Is the picked title<br/>in the retrieved set?"}
+        VG -- "no / bad JSON" --> TMPL["Template fallback<br/>uses top candidate + scorer reasons"]
+        VG -- "yes" --> OUT
+        TMPL --> OUT
+    end
+
+    OUT["Grounded recommendation<br/>pick + blurb + source + backend"] --> DISP["CLI output  (src/main.py)"]
+
+    LLM{{"LLM backend  (src/llm.py)<br/>Ollama, else deterministic stub"}}
+    LLM -.-> P
+    LLM -.-> GEN
+
+    LOG[["logging: query, profile,<br/>retrieved ids, guardrail result"]]
+    PARSE -.-> LOG
+    RETRIEVE -.-> LOG
+    VERIFY -.-> LOG
