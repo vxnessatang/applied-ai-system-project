@@ -1,0 +1,9 @@
+# Core system has ZERO required third-party packages: it runs on the Python
+# standard library alone using the built-in deterministic stub LLM backend.
+#
+# Install the line below only if you want to run against a real local model
+# via Ollama (see README, "Running with a real model").
+ollama>=0.3.0
+
+# Testing
+pytest>=8.0
